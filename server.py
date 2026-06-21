@@ -76,4 +76,4 @@ def health():
     return JSONResponse({"status": "ok"})
 
 
-app.mount("/", mcp.sse_app())
+app.mount("/mcp", mcp.sse_app())
