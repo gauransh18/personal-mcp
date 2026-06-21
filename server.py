@@ -1,13 +1,30 @@
 import json
 import os
+import time
 import uvicorn
+import httpx
 from mcp.server.fastmcp import FastMCP
 from mcp.server.sse import SseServerTransport
 from starlette.applications import Starlette
 from starlette.routing import Route, Mount
 from starlette.requests import Request
 from starlette.responses import JSONResponse
-from data import PROFILE, AVAILABILITY, SKILLS, EXPERIENCE, PROJECTS, EDUCATION, CERTIFICATIONS
+
+PROFILE_URL = "https://gauranshsharma.com/profile.json"
+CACHE_TTL = 300  # 5 minutes
+
+_cache: dict = {"data": None, "at": 0}
+
+
+def get_profile_data() -> dict:
+    now = time.time()
+    if _cache["data"] is None or now - _cache["at"] > CACHE_TTL:
+        response = httpx.get(PROFILE_URL, timeout=10)
+        response.raise_for_status()
+        _cache["data"] = response.json()
+        _cache["at"] = now
+    return _cache["data"]
+
 
 mcp = FastMCP(
     "Gauransh Sharma",
@@ -22,59 +39,53 @@ mcp = FastMCP(
 @mcp.tool()
 def get_profile() -> str:
     """Get Gauransh's name, summary, tagline, location, and website."""
-    return json.dumps(PROFILE, indent=2)
+    d = get_profile_data()
+    return json.dumps({k: d[k] for k in ("name", "tagline", "summary", "location", "website", "email", "github", "linkedin", "twitter")}, indent=2)
 
 
 @mcp.tool()
 def get_skills() -> str:
     """Get Gauransh's technical skills grouped by category: Languages, Mobile, AI & Data, Backend, DevOps."""
-    return json.dumps(SKILLS, indent=2)
+    return json.dumps(get_profile_data()["skillCategories"], indent=2)
 
 
 @mcp.tool()
 def get_experience() -> str:
     """Get Gauransh's full work history — companies, roles, dates, and what he built."""
-    return json.dumps(EXPERIENCE, indent=2)
+    return json.dumps(get_profile_data()["work"], indent=2)
 
 
 @mcp.tool()
 def get_projects() -> str:
     """Get Gauransh's notable projects with descriptions, tech stack, and links."""
-    return json.dumps(PROJECTS, indent=2)
+    return json.dumps(get_profile_data()["projects"], indent=2)
 
 
 @mcp.tool()
 def get_education() -> str:
     """Get Gauransh's educational background."""
-    return json.dumps(EDUCATION, indent=2)
+    return json.dumps(get_profile_data()["education"], indent=2)
 
 
 @mcp.tool()
 def get_certifications() -> str:
     """Get Gauransh's certifications with verification links."""
-    return json.dumps(CERTIFICATIONS, indent=2)
+    return json.dumps(get_profile_data()["certifications"], indent=2)
 
 
 @mcp.tool()
 def get_contact() -> str:
     """Get Gauransh's contact information: email, GitHub, LinkedIn, Twitter."""
-    return json.dumps({
-        "email": PROFILE["email"],
-        "github": PROFILE["github"],
-        "linkedin": PROFILE["linkedin"],
-        "twitter": PROFILE["twitter"],
-        "website": PROFILE["website"],
-    }, indent=2)
+    d = get_profile_data()
+    return json.dumps({k: d[k] for k in ("email", "github", "linkedin", "twitter", "website")}, indent=2)
 
 
 @mcp.tool()
 def is_available() -> str:
     """Check if Gauransh is currently open to new work opportunities."""
-    return json.dumps(AVAILABILITY, indent=2)
+    return json.dumps(get_profile_data()["availability"], indent=2)
 
 
-# Build the Starlette app manually using the low-level transport
-# to avoid TrustedHostMiddleware blocking external connections
 sse = SseServerTransport("/messages/")
 
 
