@@ -1,4 +1,6 @@
 import json
+from fastapi import FastAPI
+from fastapi.responses import JSONResponse
 from mcp.server.fastmcp import FastMCP
 from data import PROFILE, AVAILABILITY, SKILLS, EXPERIENCE, PROJECTS, EDUCATION, CERTIFICATIONS
 
@@ -66,4 +68,12 @@ def is_available() -> str:
     return json.dumps(AVAILABILITY, indent=2)
 
 
-app = mcp.sse_app()
+app = FastAPI()
+
+
+@app.get("/health")
+def health():
+    return JSONResponse({"status": "ok"})
+
+
+app.mount("/", mcp.sse_app())
